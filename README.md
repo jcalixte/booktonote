@@ -6,6 +6,9 @@ A high-performance image-to-text OCR server built with Gleam, powered by Tessera
 
 - **Fast OCR Processing**: Extract text from images using Tesseract OCR
 - **Multiple Format Support**: JPG, JPEG, PNG, TIFF, and PDF files
+- **Paragraph Array**: Returns both full text and split paragraphs array
+- **Character Normalization**: Automatically converts smart quotes, fancy dashes, and special characters to ASCII equivalents
+- **UTF-8 Compatible**: Clean, UTF-8 compatible output
 - **Type-Safe**: Built with Gleam for robust, type-safe code
 - **Production Ready**: Dockerized with GitLab CI/CD integration
 - **REST API**: Simple JSON API for easy integration
@@ -27,11 +30,24 @@ curl -X POST http://localhost:8080/ocr \
   "success": true,
   "data": {
     "text": "Extracted text from image...",
+    "paragraphs": [
+      "First paragraph",
+      "Second paragraph",
+      "Third paragraph"
+    ],
     "confidence": 0.0,
     "page_count": 1
   }
 }
 ```
+
+**Response Fields:**
+- `text`: Full extracted text with paragraphs separated by `\n\n` (double newlines). Each paragraph can contain single `\n` for line breaks within the paragraph.
+- `paragraphs`: Array of individual paragraphs (split by `\n\n`). Each element is one paragraph with its internal line breaks preserved.
+- `confidence`: OCR confidence score (currently always 0.0)
+- `page_count`: Number of pages processed
+
+**Note:** The output is clean text, not markdown-formatted. You can format the paragraphs as markdown on the frontend as needed.
 
 ### GET /health
 Check service health and Tesseract availability.
@@ -165,6 +181,31 @@ docker run -d -p 8080:8080 registry.gitlab.com/your-username/booktonote:latest
 
 - Maximum file size: 10MB
 - Supported formats: .jpg, .jpeg, .png, .tiff, .tif, .pdf
+
+### Character Normalization
+
+The OCR output is automatically normalized to ensure clean, UTF-8 compatible text:
+
+**Smart Quotes → Straight Quotes:**
+- `"` `"` `„` → `"`
+- `'` `'` `‚` → `'`
+
+**Fancy Dashes → Regular Hyphens:**
+- `—` (em-dash) → `-`
+- `–` (en-dash) → `-`
+
+**Other Normalizations:**
+- `…` (ellipsis) → `...`
+- `•` `◦` (bullets) → `- `
+- Various Unicode spaces → regular space
+- Zero-width characters removed
+
+**Output Format:**
+- Clean plain text (not markdown-formatted)
+- Paragraphs separated by double newlines (`\n\n`)
+- Single newlines (`\n`) preserved within paragraphs for line breaks
+- Empty paragraphs removed
+- Trailing/leading whitespace trimmed per paragraph
 
 ## Architecture
 

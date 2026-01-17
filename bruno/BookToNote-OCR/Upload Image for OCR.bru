@@ -28,10 +28,23 @@ docs {
     "success": true,
     "data": {
       "text": "Extracted text from the image...",
+      "paragraphs": [
+        "First paragraph",
+        "Second paragraph"
+      ],
       "confidence": 0.0,
       "page_count": 1
     }
   }
+
+  Note: The response includes:
+  - "text": Full text with paragraphs separated by \n\n (each paragraph can have \n for line breaks)
+  - "paragraphs": Array of individual paragraphs (split by \n\n)
+  - Clean plain text output (not markdown-formatted)
+  - Normalized characters (smart quotes → straight quotes, fancy dashes → hyphens)
+  - UTF-8 compatible output
+
+  You can format the paragraphs as markdown on the frontend as needed.
 
   Error response:
   {
