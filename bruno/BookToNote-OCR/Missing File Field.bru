@@ -1,0 +1,30 @@
+meta {
+  name: Missing File Field
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/ocr
+  body: multipartForm
+  auth: none
+}
+
+body:multipart-form {
+
+}
+
+docs {
+  Test error handling: Send request without the required "image" field.
+
+  This should return a 400 Bad Request or 415 Unsupported Media Type error.
+
+  Expected response:
+  {
+    "success": false,
+    "error": {
+      "type": "invalid_image_format",
+      "message": "Missing required field: image"
+    }
+  }
+}

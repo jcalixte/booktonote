@@ -1,0 +1,23 @@
+meta {
+  name: Health Check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/health
+  body: none
+  auth: none
+}
+
+docs {
+  Check if the OCR service is healthy and Tesseract is available.
+
+  Expected response:
+  {
+    "status": "healthy",
+    "services": {
+      "tesseract": "available"
+    }
+  }
+}

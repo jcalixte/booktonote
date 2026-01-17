@@ -1,0 +1,44 @@
+meta {
+  name: Upload Image for OCR
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/ocr
+  body: multipartForm
+  auth: none
+}
+
+body:multipart-form {
+  image: @file(/path/to/your/image.jpg)
+}
+
+docs {
+  Upload an image file to extract text using OCR.
+
+  Instructions:
+  1. Click on the "image" field in the Body tab
+  2. Click "Choose File" to select an image from your computer
+  3. Supported formats: JPG, JPEG, PNG, TIFF, PDF
+  4. Maximum file size: 10MB
+
+  Success response:
+  {
+    "success": true,
+    "data": {
+      "text": "Extracted text from the image...",
+      "confidence": 0.0,
+      "page_count": 1
+    }
+  }
+
+  Error response:
+  {
+    "success": false,
+    "error": {
+      "type": "invalid_image_format",
+      "message": "Supported formats: jpg, jpeg, png, tiff, pdf"
+    }
+  }
+}

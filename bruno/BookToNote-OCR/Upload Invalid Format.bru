@@ -1,0 +1,30 @@
+meta {
+  name: Upload Invalid Format
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/ocr
+  body: multipartForm
+  auth: none
+}
+
+body:multipart-form {
+  image: @file(/path/to/your/document.txt)
+}
+
+docs {
+  Test error handling: Upload an unsupported file format.
+
+  This should return a 400 Bad Request error.
+
+  Expected response:
+  {
+    "success": false,
+    "error": {
+      "type": "invalid_image_format",
+      "message": "Supported formats: jpg, jpeg, png, tiff, pdf"
+    }
+  }
+}
