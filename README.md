@@ -37,8 +37,7 @@ curl -X POST http://localhost:8080/ocr \
       "First paragraph",
       "Second paragraph",
       "Third paragraph"
-    ],
-    "page_count": 1
+    ]
   }
 }
 ```
@@ -47,7 +46,6 @@ curl -X POST http://localhost:8080/ocr \
 
 - `text`: Full extracted text with paragraphs separated by `\n\n` (double newlines). Each paragraph can contain single `\n` for line breaks within the paragraph.
 - `paragraphs`: Array of individual paragraphs (split by `\n\n`). Each element is one paragraph with its internal line breaks preserved.
-- `page_count`: Number of pages processed
 
 **Note:** The output is clean text, not markdown-formatted. You can format the paragraphs as markdown on the frontend as needed.
 

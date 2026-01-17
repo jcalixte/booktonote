@@ -2,7 +2,7 @@
 /// Result type for OCR operations
 pub type OcrResult {
   /// Successful OCR extraction
-  OcrSuccess(text: String, paragraphs: List(String), page_count: Int)
+  OcrSuccess(text: String, paragraphs: List(String))
   /// OCR operation failed
   OcrError(error: OcrErrorType, message: String)
 }

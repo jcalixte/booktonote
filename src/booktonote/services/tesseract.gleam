@@ -4,6 +4,7 @@ import booktonote/types.{
   ProcessingFailed, TesseractNotFound,
 }
 import gleam/int
+import gleam/list
 import gleam/string
 import simplifile
 
@@ -69,12 +70,14 @@ fn process_image(image_path: String) -> OcrResult {
   let output_file = output_base <> ".txt"
 
   // Build the tesseract command with proper shell escaping
+  // OEM 1 = LSTM neural network only (latest/most accurate)
+  // PSM 6 = Single uniform block of text (optimized for book pages with paragraphs)
   let command =
     "tesseract "
     <> shell_escape(image_path)
     <> " "
     <> shell_escape(output_base)
-    <> " --psm 3 -l eng 2>&1"
+    <> " --oem 1 --psm 6 -l eng 2>&1"
 
   // Execute Tesseract
   let _ = erlang_cmd(command)
@@ -98,7 +101,7 @@ fn process_image(image_path: String) -> OcrResult {
 }
 
 /// Parse Tesseract output and determine if text was found
-fn parse_tesseract_output(output: String) -> OcrResult {
+pub fn parse_tesseract_output(output: String) -> OcrResult {
   let trimmed = string.trim(output)
 
   case trimmed {
@@ -112,18 +115,12 @@ fn parse_tesseract_output(output: String) -> OcrResult {
         normalized_text
         |> string.split("\n\n")
         |> filter_empty_strings
+        |> list.map(remove_new_line)
 
       // Join paragraphs back with double newlines for the text field
       let clean_text = string.join(paragraphs, "\n\n")
 
-      // Count approximate pages (for now, always 1)
-      let page_count = 1
-
-      OcrSuccess(
-        text: clean_text,
-        paragraphs: paragraphs,
-        page_count: page_count,
-      )
+      OcrSuccess(text: clean_text, paragraphs: paragraphs)
     }
   }
 }
@@ -175,6 +172,12 @@ fn normalize_text(text: String) -> String {
   |> string.replace("\u{200C}", "")
   |> string.replace("\u{200D}", "")
   |> string.replace("\u{FEFF}", "")
+}
+
+fn remove_new_line(arg: String) -> String {
+  arg
+  |> string.replace("\n", " ")
+  |> string.replace("  ", " ")
 }
 
 /// Filter out empty strings from a list

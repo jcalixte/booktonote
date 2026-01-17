@@ -66,8 +66,7 @@ fn process_validated_file(uploaded_file: wisp.UploadedFile) -> Response {
     True -> {
       // Process the image with Tesseract
       case tesseract.run_ocr(uploaded_file.path) {
-        OcrSuccess(text, paragraphs, page_count) ->
-          success_response(text, paragraphs, page_count)
+        OcrSuccess(text, paragraphs) -> success_response(text, paragraphs)
         OcrError(error_type, message) ->
           error_response(error_type, message, error_status_code(error_type))
       }
@@ -98,11 +97,7 @@ fn error_status_code(error_type: OcrErrorType) -> Int {
 }
 
 /// Build a successful JSON response
-fn success_response(
-  text: String,
-  paragraphs: List(String),
-  page_count: Int,
-) -> Response {
+fn success_response(text: String, paragraphs: List(String)) -> Response {
   let paragraphs_json = json.array(paragraphs, json.string)
 
   let response_json =
@@ -113,7 +108,6 @@ fn success_response(
         json.object([
           #("text", json.string(text)),
           #("paragraphs", paragraphs_json),
-          #("page_count", json.int(page_count)),
         ]),
       ),
     ])
