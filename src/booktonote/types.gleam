@@ -1,14 +1,8 @@
 /// Type definitions for OCR operations and error handling
-
 /// Result type for OCR operations
 pub type OcrResult {
   /// Successful OCR extraction
-  OcrSuccess(
-    text: String,
-    paragraphs: List(String),
-    confidence: Float,
-    page_count: Int,
-  )
+  OcrSuccess(text: String, paragraphs: List(String), page_count: Int)
   /// OCR operation failed
   OcrError(error: OcrErrorType, message: String)
 }

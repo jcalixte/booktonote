@@ -1,5 +1,4 @@
 /// Tesseract OCR service for text extraction from images
-
 import booktonote/types.{
   type OcrResult, InvalidImageFormat, NoTextDetected, OcrError, OcrSuccess,
   ProcessingFailed, TesseractNotFound,
@@ -28,7 +27,10 @@ fn do_erlang_cmd(command: List(Int)) -> List(Int)
 
 /// Check if Tesseract is installed and accessible
 pub fn check_tesseract_installed() -> Result(String, Nil) {
-  let output = erlang_cmd("tesseract --version 2>&1 && echo __SUCCESS__ || echo __FAILURE__")
+  let output =
+    erlang_cmd(
+      "tesseract --version 2>&1 && echo __SUCCESS__ || echo __FAILURE__",
+    )
 
   case string.contains(output, "__SUCCESS__") {
     True -> {
@@ -87,7 +89,10 @@ fn process_image(image_path: String) -> OcrResult {
     Error(_) -> {
       // Clean up attempt
       let _ = simplifile.delete(output_file)
-      OcrError(ProcessingFailed, "Failed to read OCR output or Tesseract failed")
+      OcrError(
+        ProcessingFailed,
+        "Failed to read OCR output or Tesseract failed",
+      )
     }
   }
 }
@@ -114,14 +119,9 @@ fn parse_tesseract_output(output: String) -> OcrResult {
       // Count approximate pages (for now, always 1)
       let page_count = 1
 
-      // For now, we don't extract confidence from basic output
-      // Confidence would require using TSV output format
-      let confidence = 0.0
-
       OcrSuccess(
         text: clean_text,
         paragraphs: paragraphs,
-        confidence: confidence,
         page_count: page_count,
       )
     }

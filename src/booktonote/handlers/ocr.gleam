@@ -1,9 +1,8 @@
 /// OCR upload and processing handler
-
 import booktonote/services/tesseract
 import booktonote/types.{
-  type OcrErrorType, FileTooLarge, InvalidImageFormat, NoTextDetected,
-  OcrError, OcrSuccess, ProcessingFailed, TesseractNotFound,
+  type OcrErrorType, FileTooLarge, InvalidImageFormat, NoTextDetected, OcrError,
+  OcrSuccess, ProcessingFailed, TesseractNotFound,
 }
 import gleam/json
 import gleam/list
@@ -21,10 +20,12 @@ pub fn handle_upload(req: Request) -> Response {
 
   // Extract the uploaded file from form data
   // formdata.files is a list of #(field_name, UploadedFile) tuples
-  case list.find(formdata.files, fn(file_tuple) {
-    let #(field_name, _uploaded_file) = file_tuple
-    field_name == "image"
-  }) {
+  case
+    list.find(formdata.files, fn(file_tuple) {
+      let #(field_name, _uploaded_file) = file_tuple
+      field_name == "image"
+    })
+  {
     Error(_) ->
       error_response(InvalidImageFormat, "Missing required field: image", 400)
 
@@ -65,8 +66,8 @@ fn process_validated_file(uploaded_file: wisp.UploadedFile) -> Response {
     True -> {
       // Process the image with Tesseract
       case tesseract.run_ocr(uploaded_file.path) {
-        OcrSuccess(text, paragraphs, confidence, page_count) ->
-          success_response(text, paragraphs, confidence, page_count)
+        OcrSuccess(text, paragraphs, page_count) ->
+          success_response(text, paragraphs, page_count)
         OcrError(error_type, message) ->
           error_response(error_type, message, error_status_code(error_type))
       }
@@ -100,7 +101,6 @@ fn error_status_code(error_type: OcrErrorType) -> Int {
 fn success_response(
   text: String,
   paragraphs: List(String),
-  confidence: Float,
   page_count: Int,
 ) -> Response {
   let paragraphs_json = json.array(paragraphs, json.string)
@@ -113,7 +113,6 @@ fn success_response(
         json.object([
           #("text", json.string(text)),
           #("paragraphs", paragraphs_json),
-          #("confidence", json.float(confidence)),
           #("page_count", json.int(page_count)),
         ]),
       ),
