@@ -1,5 +1,6 @@
 /// Main server entry point
 
+import booktonote/infra/paddleocr
 import booktonote/router
 import gleam/erlang/process
 import gleam/io
@@ -12,6 +13,13 @@ pub fn main() -> Nil {
   wisp.configure_logger()
 
   io.println("Starting BookToNote OCR server...")
+
+  // Preload OCR model at startup
+  io.println("Loading OCR model...")
+  case paddleocr.ensure_worker_running() {
+    Ok(_) -> io.println("OCR model loaded successfully")
+    Error(err) -> io.println("Warning: Failed to load OCR model: " <> err)
+  }
 
   // Generate a secret key base for Wisp
   let secret_key_base = wisp.random_string(64)

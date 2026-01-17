@@ -33,13 +33,20 @@ RUN gleam export erlang-shipment
 # Runtime stage
 FROM debian:bookworm-slim
 
-# Install runtime dependencies
+# Install runtime dependencies including Python for PaddleOCR
 RUN apt-get update && apt-get install -y \
-    tesseract-ocr \
-    tesseract-ocr-eng \
+    python3 \
+    python3-pip \
+    python3-venv \
     ca-certificates \
     libssl3 \
     libncurses6 \
+    libgomp1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxrender1 \
+    libxext6 \
+    libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Erlang runtime
@@ -53,6 +60,14 @@ RUN apt-get update && apt-get install -y \
 
 # Create app directory
 WORKDIR /app
+
+# Copy and install Python dependencies
+COPY requirements.txt ./
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+
+# Copy OCR scripts
+COPY scripts ./scripts
+RUN chmod +x scripts/ocr_engine.py scripts/ocr_worker.py
 
 # Copy built application from builder
 COPY --from=builder /app/build/erlang-shipment ./

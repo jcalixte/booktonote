@@ -1,8 +1,8 @@
 /// OCR upload and processing handler
-import booktonote/services/tesseract
+import booktonote/services/ocr
 import booktonote/types.{
   type OcrErrorType, FileTooLarge, InvalidImageFormat, NoTextDetected, OcrError,
-  OcrSuccess, ProcessingFailed, TesseractNotFound,
+  OcrEngineNotFound, OcrSuccess, ProcessingFailed,
 }
 import gleam/json
 import gleam/list
@@ -64,8 +64,8 @@ fn process_validated_file(uploaded_file: wisp.UploadedFile) -> Response {
         400,
       )
     True -> {
-      // Process the image with Tesseract
-      case tesseract.run_ocr(uploaded_file.path) {
+      // Process the image with OCR engine
+      case ocr.run_ocr(uploaded_file.path) {
         OcrSuccess(text, paragraphs) -> success_response(text, paragraphs)
         OcrError(error_type, message) ->
           error_response(error_type, message, error_status_code(error_type))
@@ -88,7 +88,7 @@ fn is_valid_image_format(filename: String) -> Bool {
 /// Map OcrErrorType to HTTP status code
 fn error_status_code(error_type: OcrErrorType) -> Int {
   case error_type {
-    TesseractNotFound -> 503
+    OcrEngineNotFound -> 503
     InvalidImageFormat -> 400
     ProcessingFailed -> 500
     FileTooLarge -> 413
@@ -122,7 +122,7 @@ fn error_response(
   status_code: Int,
 ) -> Response {
   let error_type_string = case error_type {
-    TesseractNotFound -> "tesseract_not_found"
+    OcrEngineNotFound -> "ocr_engine_not_found"
     InvalidImageFormat -> "invalid_image_format"
     ProcessingFailed -> "processing_failed"
     FileTooLarge -> "file_too_large"

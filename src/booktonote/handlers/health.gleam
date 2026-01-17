@@ -1,12 +1,12 @@
 /// Health check endpoint handler
 
-import booktonote/services/tesseract
+import booktonote/infra/paddleocr
 import gleam/json
 import wisp.{type Response}
 
 /// Handle health check requests
 pub fn check() -> Response {
-  let status = case tesseract.check_tesseract_installed() {
+  let status = case paddleocr.check_engine_installed() {
     Ok(_version) -> "available"
     Error(_) -> "unavailable"
   }
@@ -16,7 +16,7 @@ pub fn check() -> Response {
       #("status", json.string("healthy")),
       #(
         "services",
-        json.object([#("tesseract", json.string(status))]),
+        json.object([#("ocr_engine", json.string(status))]),
       ),
     ])
 

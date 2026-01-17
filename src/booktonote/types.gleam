@@ -9,8 +9,8 @@ pub type OcrResult {
 
 /// Specific error types for OCR operations
 pub type OcrErrorType {
-  /// Tesseract OCR is not installed or not accessible
-  TesseractNotFound
+  /// OCR engine is not installed or not accessible
+  OcrEngineNotFound
   /// The uploaded file is not a supported image format
   InvalidImageFormat
   /// OCR processing encountered an error
