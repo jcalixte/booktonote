@@ -21,23 +21,8 @@ os.environ["GLOG_minloglevel"] = "2"
 os.environ["GLOG_v"] = "0"
 os.environ["FLAGS_use_mkldnn"] = "0"
 
-# Disable model source/connectivity check at the source
-os.environ["DISABLE_MODEL_SOURCE_CHECK"] = "True"
-os.environ["HUB_HOME"] = "/tmp/paddlehub"
-
-# Patch the connectivity check before importing paddleocr
-try:
-    from paddlehub.utils import utils as hub_utils
-    hub_utils.check_url = lambda *a, **kw: True
-except (ImportError, AttributeError, ModuleNotFoundError):
-    pass
-
-try:
-    from paddlehub.server import server_source
-    server_source.check_connectivity = lambda *a, **kw: None
-    server_source.ServerSource.check_connectivity = lambda *a, **kw: None
-except (ImportError, AttributeError, ModuleNotFoundError):
-    pass
+# Disable model source/connectivity check (paddlex uses this env var)
+os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
 
 # Global OCR instance - loaded once at startup
 _ocr = None

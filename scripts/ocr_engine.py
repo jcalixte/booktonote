@@ -17,10 +17,10 @@ import sys
 import os
 from pathlib import Path
 
-# Suppress PaddlePaddle logging
+# Suppress PaddlePaddle logging and skip connectivity check
 os.environ["GLOG_minloglevel"] = "2"
 os.environ["GLOG_v"] = "0"
-os.environ["DISABLE_MODEL_SOURCE_CHECK"] = "True"
+os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
 
 
 def run_ocr(image_path: str) -> tuple[str, list[str]]:
