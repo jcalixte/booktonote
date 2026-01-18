@@ -1,12 +1,12 @@
 /// Health check endpoint handler
 
-import booktonote/infra/qwen_vl
+import booktonote/ocr_engine.{type OcrEngine}
 import gleam/json
 import wisp.{type Response}
 
 /// Handle health check requests
-pub fn check() -> Response {
-  let status = case qwen_vl.check_engine_installed() {
+pub fn check(engine: OcrEngine) -> Response {
+  let status = case engine.check_installed() {
     Ok(_version) -> "available"
     Error(_) -> "unavailable"
   }

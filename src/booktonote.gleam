@@ -1,6 +1,6 @@
 /// Main server entry point
 
-import booktonote/infra/qwen_vl
+import booktonote/ocr_engine
 import booktonote/router
 import gleam/erlang/process
 import gleam/io
@@ -14,19 +14,26 @@ pub fn main() -> Nil {
 
   io.println("Starting BookToNote OCR server...")
 
-  // Preload Qwen2-VL model at startup
-  io.println("Loading Qwen2-VL model...")
-  case qwen_vl.ensure_worker_running() {
-    Ok(_) -> io.println("Qwen2-VL model loaded successfully")
-    Error(err) -> io.println("Warning: Failed to load Qwen2-VL model: " <> err)
+  // Create OCR engine (dependency injection)
+  let engine = ocr_engine.qwen_vl()
+
+  // Preload model at startup
+  io.println("Loading " <> engine.name <> " model...")
+  case engine.ensure_running() {
+    Ok(_) -> io.println(engine.name <> " model loaded successfully")
+    Error(err) ->
+      io.println("Warning: Failed to load " <> engine.name <> " model: " <> err)
   }
 
   // Generate a secret key base for Wisp
   let secret_key_base = wisp.random_string(64)
 
+  // Create handler with engine injected
+  let handler = fn(req) { router.handle_request(req, engine) }
+
   // Start the server with Wisp-Mist integration
   let assert Ok(_) =
-    wisp_mist.handler(router.handle_request, secret_key_base)
+    wisp_mist.handler(handler, secret_key_base)
     |> mist.new
     |> mist.port(8080)
     |> mist.start

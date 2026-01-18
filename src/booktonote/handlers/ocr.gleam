@@ -1,4 +1,5 @@
 /// OCR upload and processing handler
+import booktonote/ocr_engine.{type OcrEngine}
 import booktonote/services/ocr
 import booktonote/types.{
   type OcrErrorType, FileTooLarge, InvalidImageFormat, NoTextDetected, OcrError,
@@ -14,7 +15,7 @@ import wisp.{type Request, type Response}
 const max_file_size = 10_485_760
 
 /// Handle OCR upload requests
-pub fn handle_upload(req: Request) -> Response {
+pub fn handle_upload(req: Request, engine: OcrEngine) -> Response {
   // Use wisp's form parsing to handle multipart data
   use formdata <- wisp.require_form(req)
 
@@ -40,7 +41,7 @@ pub fn handle_upload(req: Request) -> Response {
                 "File exceeds maximum size (10MB)",
                 413,
               )
-            False -> process_validated_file(uploaded_file)
+            False -> process_validated_file(uploaded_file, engine)
           }
         Error(_) ->
           error_response(
@@ -54,7 +55,10 @@ pub fn handle_upload(req: Request) -> Response {
 }
 
 /// Process a validated uploaded file
-fn process_validated_file(uploaded_file: wisp.UploadedFile) -> Response {
+fn process_validated_file(
+  uploaded_file: wisp.UploadedFile,
+  engine: OcrEngine,
+) -> Response {
   // Validate file extension
   case is_valid_image_format(uploaded_file.file_name) {
     False ->
@@ -65,7 +69,7 @@ fn process_validated_file(uploaded_file: wisp.UploadedFile) -> Response {
       )
     True -> {
       // Process the image with OCR engine
-      case ocr.run_ocr(uploaded_file.path) {
+      case ocr.run_ocr(engine, uploaded_file.path) {
         OcrSuccess(text, paragraphs) -> success_response(text, paragraphs)
         OcrError(error_type, message) ->
           error_response(error_type, message, error_status_code(error_type))

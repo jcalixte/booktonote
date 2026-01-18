@@ -2,6 +2,7 @@
 
 import booktonote/handlers/health
 import booktonote/handlers/ocr
+import booktonote/ocr_engine.{type OcrEngine}
 import gleam/http
 import gleam/int
 import gleam/json
@@ -45,7 +46,7 @@ fn log_request_with_timing(
 }
 
 /// Main request handler with middleware
-pub fn handle_request(req: Request) -> Response {
+pub fn handle_request(req: Request, engine: OcrEngine) -> Response {
   // Apply logging middleware with timing
   use <- log_request_with_timing(req)
 
@@ -57,14 +58,14 @@ pub fn handle_request(req: Request) -> Response {
     // POST /ocr - OCR upload endpoint
     ["ocr"] ->
       case req.method {
-        http.Post -> ocr.handle_upload(req)
+        http.Post -> ocr.handle_upload(req, engine)
         _ -> wisp.method_not_allowed([http.Post])
       }
 
     // GET /health - Health check endpoint
     ["health"] ->
       case req.method {
-        http.Get -> health.check()
+        http.Get -> health.check(engine)
         _ -> wisp.method_not_allowed([http.Get])
       }
 
