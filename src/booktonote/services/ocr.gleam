@@ -1,6 +1,6 @@
 /// Abstract OCR service for text extraction from images
 /// Implementation details are delegated to infra layer
-import booktonote/infra/paddleocr
+import booktonote/infra/qwen_vl
 import booktonote/types.{
   type OcrResult, InvalidImageFormat, NoTextDetected, OcrError, OcrSuccess,
   OcrEngineNotFound,
@@ -12,7 +12,7 @@ import simplifile
 /// Run OCR on an image file and extract text
 pub fn run_ocr(image_path: String) -> OcrResult {
   // Check if OCR engine is available
-  case paddleocr.check_engine_installed() {
+  case qwen_vl.check_engine_installed() {
     Error(_) ->
       OcrError(
         OcrEngineNotFound,
@@ -25,7 +25,7 @@ pub fn run_ocr(image_path: String) -> OcrResult {
           OcrError(InvalidImageFormat, "Image file not found or not accessible")
         Ok(True) -> {
           // Delegate to implementation
-          case paddleocr.extract_text(image_path) {
+          case qwen_vl.extract_text(image_path) {
             Ok(text) -> parse_ocr_output(text)
             Error(message) -> OcrError(types.ProcessingFailed, message)
           }

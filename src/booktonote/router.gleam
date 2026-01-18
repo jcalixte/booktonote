@@ -3,13 +3,51 @@
 import booktonote/handlers/health
 import booktonote/handlers/ocr
 import gleam/http
+import gleam/int
 import gleam/json
+import gleam/string
 import wisp.{type Request, type Response}
+
+/// Get current time in milliseconds
+@external(erlang, "erlang", "monotonic_time")
+fn monotonic_time_native() -> Int
+
+@external(erlang, "erlang", "convert_time_unit")
+fn convert_time_unit(time: Int, from: a, to: b) -> Int
+
+fn now_ms() -> Int {
+  convert_time_unit(monotonic_time_native(), Native, Millisecond)
+}
+
+/// Custom time unit atoms for Erlang FFI
+type TimeUnit {
+  Native
+  Millisecond
+}
+
+/// Log request with timing
+fn log_request_with_timing(
+  req: Request,
+  handler: fn() -> Response,
+) -> Response {
+  let start = now_ms()
+  let response = handler()
+  let duration = now_ms() - start
+
+  let method = string.uppercase(http.method_to_string(req.method))
+  let path = "/" <> string.join(wisp.path_segments(req), "/")
+  let status = int.to_string(response.status)
+  let duration_str = int.to_string(duration) <> "ms"
+
+  wisp.log_info(status <> " " <> method <> " " <> path <> " " <> duration_str)
+
+  response
+}
 
 /// Main request handler with middleware
 pub fn handle_request(req: Request) -> Response {
-  // Apply logging middleware
-  use <- wisp.log_request(req)
+  // Apply logging middleware with timing
+  use <- log_request_with_timing(req)
 
   // Apply crash rescue middleware
   use <- wisp.rescue_crashes

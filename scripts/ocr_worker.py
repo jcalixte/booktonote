@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Persistent PaddleOCR worker for BookToNote OCR Server.
+Persistent Qwen2-VL OCR worker for BookToNote OCR Server.
 Keeps the OCR model loaded in memory for fast subsequent requests.
 
 Protocol (line-based JSON over stdin/stdout):
@@ -16,152 +16,147 @@ import os
 import json
 from pathlib import Path
 
-# Suppress PaddlePaddle logging and model source checking before importing
-os.environ["GLOG_minloglevel"] = "2"
-os.environ["GLOG_v"] = "0"
-os.environ["FLAGS_use_mkldnn"] = "0"
+# Suppress warnings
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# Disable model source/connectivity check (paddlex uses this env var)
-os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
+# Global model instances - loaded once at startup
+_model = None
+_processor = None
+_device = None
+_torch_dtype = None
 
-# Global OCR instance - loaded once at startup
-_ocr = None
+# Maximum image dimension (resize guard for memory)
+MAX_IMAGE_SIZE = 1024
 
 
 def init_ocr():
-    """Initialize PaddleOCR once at startup."""
-    global _ocr
-    from paddleocr import PaddleOCR
-    _ocr = PaddleOCR(
-        use_textline_orientation=True,
-        lang='en',
+    """Initialize Qwen2-VL model once at startup."""
+    global _model, _processor, _device, _torch_dtype
+
+    import torch
+    from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
+
+    # Select device
+    if torch.cuda.is_available():
+        _device = "cuda"
+        _torch_dtype = torch.float16
+    elif torch.backends.mps.is_available():
+        _device = "mps"
+        _torch_dtype = torch.float32  # MPS needs float32
+    else:
+        _device = "cpu"
+        _torch_dtype = torch.float32
+
+    model_id = "Qwen/Qwen2-VL-2B-Instruct"
+
+    _model = Qwen2VLForConditionalGeneration.from_pretrained(
+        model_id,
+        dtype=_torch_dtype,
+        device_map=_device
     )
-    return _ocr
+
+    _processor = AutoProcessor.from_pretrained(model_id)
+
+    return _model, _processor
+
+
+def resize_image_if_needed(image):
+    """
+    Resize image if it exceeds MAX_IMAGE_SIZE on any dimension.
+    Returns the (possibly resized) image.
+    """
+    from PIL import Image
+
+    width, height = image.size
+
+    if width <= MAX_IMAGE_SIZE and height <= MAX_IMAGE_SIZE:
+        return image
+
+    # Calculate resize ratio
+    ratio = min(MAX_IMAGE_SIZE / width, MAX_IMAGE_SIZE / height)
+    new_size = (int(width * ratio), int(height * ratio))
+
+    return image.resize(new_size, Image.Resampling.LANCZOS)
 
 
 def run_ocr(image_path: str) -> tuple[str, list[str]]:
     """
-    Run PaddleOCR on an image and return extracted text.
-    Uses the global pre-loaded OCR instance.
+    Run Qwen2-VL OCR on an image and return extracted text.
+    Uses the global pre-loaded model instance.
 
     Returns:
         tuple of (full_text, list_of_paragraphs)
     """
-    global _ocr
+    global _model, _processor, _device
 
-    # Run OCR using the predict API
-    result = _ocr.predict(image_path)
+    from PIL import Image
+    from qwen_vl_utils import process_vision_info
 
-    if not result or not result[0] or not result[0].get('rec_texts'):
+    # Load and resize image
+    image = Image.open(image_path).convert("RGB")
+    image = resize_image_if_needed(image)
+
+    # Save resized image to temp file for processing
+    temp_path = "/tmp/qwen_vl_resized.jpg"
+    image.save(temp_path, quality=95)
+
+    # Prepare messages for OCR
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image", "image": f"file://{temp_path}"},
+                {"type": "text", "text": "Extract all the text from this book page. Output only the text, preserving paragraphs."},
+            ],
+        }
+    ]
+
+    # Process inputs
+    text = _processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    image_inputs, video_inputs = process_vision_info(messages)
+    inputs = _processor(
+        text=[text],
+        images=image_inputs,
+        videos=video_inputs,
+        padding=True,
+        return_tensors="pt",
+    ).to(_device)
+
+    # Generate
+    generated_ids = _model.generate(**inputs, max_new_tokens=2048)
+    generated_ids_trimmed = [
+        out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+    ]
+
+    full_text = _processor.batch_decode(
+        generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+    )[0].strip()
+
+    if not full_text:
         return "", []
 
-    # Extract text lines with their positions
-    lines = []
-    rec_texts = result[0].get('rec_texts', [])
-    rec_scores = result[0].get('rec_scores', [])
-    rec_boxes = result[0].get('rec_boxes', [])
+    # Split into paragraphs
+    raw_paragraphs = full_text.split("\n\n")
 
-    for i, text in enumerate(rec_texts):
-        confidence = rec_scores[i] if i < len(rec_scores) else 0
-        if text and confidence > 0.5:
-            # Get vertical position from bounding box
-            if i < len(rec_boxes):
-                bbox = rec_boxes[i]
-                y_pos = (bbox[1] + bbox[3]) / 2  # Average of top and bottom y
-            else:
-                y_pos = i * 10  # Fallback ordering
-            lines.append((y_pos, text.strip()))
+    # If no double newlines, try single newlines
+    if len(raw_paragraphs) == 1:
+        raw_paragraphs = full_text.split("\n")
 
-    if not lines:
-        return "", []
-
-    # Sort by vertical position (top to bottom)
-    lines.sort(key=lambda x: x[0])
-
-    # Group lines into paragraphs based on vertical gaps
+    # Clean up paragraphs
     paragraphs = []
-    current_paragraph = []
-    last_y = None
+    for p in raw_paragraphs:
+        cleaned = " ".join(p.split())  # Normalize whitespace
+        if cleaned:
+            paragraphs.append(cleaned)
 
-    for y_pos, text in lines:
-        if last_y is not None:
-            # If there's a significant vertical gap, start a new paragraph
-            gap = y_pos - last_y
-            if gap > 40:
-                if current_paragraph:
-                    paragraphs.append(" ".join(current_paragraph))
-                    current_paragraph = []
-
-        current_paragraph.append(text)
-        last_y = y_pos
-
-    # Don't forget the last paragraph
-    if current_paragraph:
-        paragraphs.append(" ".join(current_paragraph))
-
-    # Join paragraphs with double newlines
+    # Reconstruct full text
     full_text = "\n\n".join(paragraphs)
 
     return full_text, paragraphs
 
 
-def detect_image_type(file_path: str) -> str:
-    """Detect image type from file magic bytes."""
-    with open(file_path, 'rb') as f:
-        header = f.read(12)
-
-    # Check magic bytes
-    if header[:3] == b'\xff\xd8\xff':
-        return 'jpg'
-    elif header[:8] == b'\x89PNG\r\n\x1a\n':
-        return 'png'
-    elif header[:4] == b'%PDF':
-        return 'pdf'
-    elif header[:2] == b'BM':
-        return 'bmp'
-    elif header[:4] in (b'II\x2a\x00', b'MM\x00\x2a'):
-        return 'tiff'
-    else:
-        # Default to png
-        return 'png'
-
-
-# Maximum dimension for OCR processing (longer side)
-MAX_OCR_DIMENSION = 2200
-
-
-def resize_image_if_needed(image_path: str, output_path: str) -> bool:
-    """
-    Resize image if it exceeds MAX_OCR_DIMENSION.
-    Uses lossless PNG output to preserve quality.
-    Returns True if image was resized, False if copied as-is.
-    """
-    from PIL import Image
-
-    with Image.open(image_path) as img:
-        width, height = img.size
-        max_dim = max(width, height)
-
-        if max_dim <= MAX_OCR_DIMENSION:
-            # Image is small enough, just copy it
-            img.save(output_path, 'PNG')
-            return False
-
-        # Calculate new dimensions maintaining aspect ratio
-        scale = MAX_OCR_DIMENSION / max_dim
-        new_width = int(width * scale)
-        new_height = int(height * scale)
-
-        # Resize using high-quality Lanczos resampling
-        resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        resized.save(output_path, 'PNG')
-        return True
-
-
 def process_request(request: dict) -> dict:
     """Process a single OCR request."""
-    import time
-
     image_path = request.get("image_path")
 
     if not image_path:
@@ -170,13 +165,8 @@ def process_request(request: dict) -> dict:
     if not Path(image_path).is_file():
         return {"success": False, "error": f"File not found: {image_path}"}
 
-    # Preprocess: resize large images and save as PNG (PaddleOCR needs proper extension)
-    temp_path = None
     try:
-        temp_path = f"/tmp/ocr_input_{int(time.time() * 1000000)}.png"
-        was_resized = resize_image_if_needed(image_path, temp_path)
-
-        full_text, paragraphs = run_ocr(temp_path)
+        full_text, paragraphs = run_ocr(image_path)
 
         if not full_text.strip():
             return {"success": False, "error": "No text detected"}
@@ -188,27 +178,20 @@ def process_request(request: dict) -> dict:
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
-    finally:
-        # Clean up temp file
-        if temp_path and Path(temp_path).exists():
-            try:
-                Path(temp_path).unlink()
-            except:
-                pass
 
 
 def main():
     """Main loop - read requests from stdin, write responses to stdout."""
-    # Initialize OCR model once at startup
-    sys.stderr.write("Loading PaddleOCR model...\n")
+    # Initialize model once at startup
+    sys.stderr.write("Loading Qwen2-VL model...\n")
     sys.stderr.flush()
 
     try:
         init_ocr()
-        sys.stderr.write("PaddleOCR model loaded successfully\n")
+        sys.stderr.write("Qwen2-VL model loaded successfully\n")
         sys.stderr.flush()
     except Exception as e:
-        sys.stderr.write(f"Failed to load PaddleOCR: {e}\n")
+        sys.stderr.write(f"Failed to load Qwen2-VL: {e}\n")
         sys.stderr.flush()
         sys.exit(1)
 

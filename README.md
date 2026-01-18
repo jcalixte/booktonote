@@ -183,6 +183,14 @@ docker run -d -p 8080:8080 registry.gitlab.com/your-username/booktonote:latest
 ### Environment Variables
 
 - `PORT`: Server port (default: 8080)
+- `QWEN_VL_SCRIPT_PATH`: Path to the Qwen2-VL OCR script
+  - Local development: `./scripts/qwen_vl_engine.py` (default)
+  - Docker: `/app/scripts/qwen_vl_engine.py`
+
+**Example (Docker):**
+```bash
+docker run -e QWEN_VL_SCRIPT_PATH=/app/scripts/qwen_vl_engine.py ...
+```
 
 ### File Limits
 

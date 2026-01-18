@@ -1,12 +1,12 @@
 /// Health check endpoint handler
 
-import booktonote/infra/paddleocr
+import booktonote/infra/qwen_vl
 import gleam/json
 import wisp.{type Response}
 
 /// Handle health check requests
 pub fn check() -> Response {
-  let status = case paddleocr.check_engine_installed() {
+  let status = case qwen_vl.check_engine_installed() {
     Ok(_version) -> "available"
     Error(_) -> "unavailable"
   }
