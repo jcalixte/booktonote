@@ -2,8 +2,8 @@
 /// Implementation details are injected via OcrEngine
 import booktonote/ocr_engine.{type OcrEngine}
 import booktonote/types.{
-  type OcrResult, InvalidImageFormat, NoTextDetected, OcrError, OcrSuccess,
-  OcrEngineNotFound,
+  type OcrResult, InvalidImageFormat, NoTextDetected, OcrEngineNotFound,
+  OcrError, OcrSuccess,
 }
 import gleam/list
 import gleam/string
@@ -69,6 +69,8 @@ fn normalize_text(text: String) -> String {
   |> string.replace("\u{201C}", double_quote)
   |> string.replace("\u{201D}", double_quote)
   |> string.replace("\u{201E}", double_quote)
+  |> string.replace("«", double_quote)
+  |> string.replace("»", double_quote)
   // Normalize left and right single quotes to straight single quote
   |> string.replace("\u{2018}", "'")
   |> string.replace("\u{2019}", "'")
