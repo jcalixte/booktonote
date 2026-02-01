@@ -7,6 +7,9 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
+      - HF_HOME=/data/huggingface
+    volumes:
+      - huggingface_cache:/data/huggingface
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
@@ -14,3 +17,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+volumes:
+  huggingface_cache:
